@@ -1,23 +1,12 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
+﻿using StudioTGMinesweeperService.Additional;
 using StudioTGMinesweeperService.Interfaces;
 using StudioTGMinesweeperService.Models;
 using StudioTGMinesweeperService.Models.DbModels;
-using System.Diagnostics.Eventing.Reader;
 
 namespace StudioTGMinesweeperService.Services
 {
     public class GameTurnRequestService : IGameTurnRequestService
     {
-        //need to check if this cell was already checked and send error
-
-        //get point and game id +
-        //get initialized field from NewGame table +
-        //checking what cell it is +
-        //write that cell value +
-        //if x than open full field and send where completed true
-        //if not than algorhytm of opening nearby cells
-        //after that update field in GameTurn table
-        //create new GameInfo
         private readonly INewGameRepository _newGameRepository;
 
         private readonly IGameTurnRepository _gameTurnRepository;
@@ -28,20 +17,17 @@ namespace StudioTGMinesweeperService.Services
             _gameTurnRepository = gameTurnRepository;
         }
 
-        //if cell is X then send completed game +
-        //else cell is not X then open nearby cells +
-        //if 0 then recursive opening till it's another number +
-        //at the end checking if all cells are opened for "completed" flag
         public async Task<GameInfoResponse> MakeTurn(GameTurnRequest request)
         {
             var gameId = request.game_id;
             var rowIndex = request.row;
             var colIndex = request.col;
 
+            //suppose we can't have null initGame
             var initGame = await _newGameRepository.GetByIdAsync(gameId);
             
-            var initCharArray = ConvertTo2DCharArray(initGame.width, initGame.height, initGame.field);
-            var initCell = initCharArray[rowIndex, colIndex];
+            var initField = ArrayMethods.ConvertTo2DCharArray(initGame.width, initGame.height, initGame.field);
+            var initCell = initField[rowIndex, colIndex];
 
             var currentGame = await _gameTurnRepository.GetByIdAsync(gameId);
             if (currentGame.completed)
@@ -49,12 +35,14 @@ namespace StudioTGMinesweeperService.Services
                 throw new ArgumentException("больше нельзя делать ходы");
             }
 
-            var currentField = ConvertTo2DCharArray(currentGame.width, currentGame.height, currentGame.field);
+            var currentField = ArrayMethods.ConvertTo2DCharArray(currentGame.width, currentGame.height, currentGame.field);
 
             if (currentField[rowIndex,colIndex] != ' ')
             {
                 throw new ArgumentException("уже открытая ячейка");
             }
+
+            //uncovering algo
             if (initCell == 'X')
             {
                 for (int i = 0; i < initGame.width; i++)
@@ -68,10 +56,10 @@ namespace StudioTGMinesweeperService.Services
             }
             else if(initCell >= '0' && initCell <= '8')
             {
-                UncoverField(rowIndex, colIndex, currentField, initCharArray, initGame.width, initGame.height);
+                UncoverField(rowIndex, colIndex, currentField, initField, initGame.width, initGame.height);
             }
 
-            currentGame.field = CreateStringArrayField(currentField, currentGame.width, currentGame.height);
+            currentGame.field = ArrayMethods.CreateStringArrayField(currentField, currentGame.width, currentGame.height);
 
             //if we find any closed field which is not X than continue game
             //else change all X to M and uncover all field
@@ -83,7 +71,7 @@ namespace StudioTGMinesweeperService.Services
                 {
                     if(currentField[i, j] == ' ')
                     {
-                        if (initCharArray[i,j] != 'X')
+                        if (initField[i,j] != 'X')
                         {
                             completed = false;
                         }
@@ -94,53 +82,13 @@ namespace StudioTGMinesweeperService.Services
             if (completed)
             {
                 currentGame.completed = true;
-                for (int i = 0; i < initGame.width; i++)
-                {
-                    for (int j = 0; j < initGame.height; j++)
-                    {
-                        if (currentField[i, j] == ' ')
-                        {
-                            if (initCharArray[i, j] == 'X')
-                            {
-                                currentField[i, j] = 'M';
-                            }
-                        }
-                    }
-                }
+                ReplaceWithMSymbol(initGame, initField, currentField);
             }
 
             await _gameTurnRepository.UpdateAsync(currentGame);
 
             GameInfoResponse response = new GameInfoResponse { game_id = gameId, width = initGame.width, height = initGame.height, mines_count = initGame.mines_count, completed = false, field = currentField };
             return response;
-        }
-
-        public char[,] ConvertTo2DCharArray(int width, int height, string[] field)
-        {
-            var charArray = new char[width, height];
-            for (int i = 0; i < width; i++)
-            {
-                for (int j = 0; j < height; j++)
-                {
-                    charArray[i, j] = field[i][j];
-                }
-            }
-            return charArray;
-        }
-
-        public string[] CreateStringArrayField(char[,] fieldChars, int width, int height)
-        {
-            string[] gameFieldString = new string[width];
-            for (int i = 0; i < width; i++)
-            {
-                string row = string.Empty;
-                for (int j = 0; j < height; j++)
-                {
-                    row += fieldChars[i, j];
-                }
-                gameFieldString[i] = row;
-            }
-            return gameFieldString;
         }
 
         public void UncoverField(int row, int col, char[,] currentField, char[,] gameField, int width, int height)
@@ -161,6 +109,23 @@ namespace StudioTGMinesweeperService.Services
                 else if (gameField[row,col] > '0' && gameField[row,col] <= '8')
                 {
                     currentField[row, col] = gameField[row, col];
+                }
+            }
+        }
+
+        public void ReplaceWithMSymbol(NewGameModel initGame, char[,] initField, char[,] currentField)
+        {
+            for (int i = 0; i < initGame.width; i++)
+            {
+                for (int j = 0; j < initGame.height; j++)
+                {
+                    if (currentField[i, j] == ' ')
+                    {
+                        if (initField[i, j] == 'X')
+                        {
+                            currentField[i, j] = 'M';
+                        }
+                    }
                 }
             }
         }

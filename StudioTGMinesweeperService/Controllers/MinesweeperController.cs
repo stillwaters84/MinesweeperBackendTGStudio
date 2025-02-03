@@ -44,7 +44,7 @@ namespace StudioTGMinesweeperService.Controllers
             }
             catch (ArgumentException e)
             {
-                return BadRequest(e.Message);
+                return BadRequest(new ErrorResponse { error = e.Message });
             }
             return result;
         }

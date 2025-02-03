@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StudioTGMinesweeperService.Contexts;
 using StudioTGMinesweeperService.Interfaces;
-using StudioTGMinesweeperService.Models;
 using StudioTGMinesweeperService.Models.DbModels;
 
 namespace StudioTGMinesweeperService.Repositories

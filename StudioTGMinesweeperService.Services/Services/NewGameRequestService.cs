@@ -1,9 +1,7 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
+﻿using StudioTGMinesweeperService.Additional;
 using StudioTGMinesweeperService.Interfaces;
 using StudioTGMinesweeperService.Models;
 using StudioTGMinesweeperService.Models.DbModels;
-using StudioTGMinesweeperService.Repositories;
 
 namespace StudioTGMinesweeperService.Services
 {
@@ -19,18 +17,14 @@ namespace StudioTGMinesweeperService.Services
             _gameTurnRepository = gameTurnRepository;
         }
 
-        public async Task<GameInfoResponse> CreateNewGame(NewGameRequest request) //3 parameters (maybe newgamerequest) - NewGameRequest
+        public async Task<GameInfoResponse> CreateNewGame(NewGameRequest request)
         {
-            //checking if width or height <= 30, checking mine_count
-            //create array [width][height]
             var initializedGame = CreateGame(request);
             await _newGameRepository.Create(initializedGame);
 
             //after db save we are hiding the field
             char[,] emptyGameFieldArray = new char[request.width, request.height];
-            string[] emptyGameFieldString = CreateEmptyField(request.width, request.height);
-            //FOR WITH ' ' SYMBOLS
-            //initializedGame.field = emptyGameField;
+            string[] emptyGameFieldString = ArrayMethods.CreateEmptyField(request.width, request.height);
 
             GameTurnModel gameTurnZero = new GameTurnModel { Id = initializedGame.Id, width = request.width, height = request.height, mines_count = request.mines_count, completed = false, field = emptyGameFieldString };
             await _gameTurnRepository.Create(gameTurnZero);
@@ -52,28 +46,12 @@ namespace StudioTGMinesweeperService.Services
         {
             var gameId = new Guid();
             var gameFieldArray = CreateCompletedField(request.width, request.height, request.mines_count);
-            var gameFieldString = CreateStringArrayField(gameFieldArray, request.width, request.height);
+            var gameFieldString = ArrayMethods.CreateStringArrayField(gameFieldArray, request.width, request.height);
 
             var gameInfo = new NewGameModel { Id = gameId, width = request.width, height = request.height, mines_count = request.mines_count, completed = false, field = gameFieldString };
             return gameInfo;
         }
 
-        public string[] CreateStringArrayField(char[,] fieldChars, int width, int height)
-        {
-            string[] gameFieldString = new string[width];
-            for (int i = 0; i < width; i++)
-            {
-                string row = string.Empty;
-                for (int j = 0; j < height; j++)
-                {
-                    row += fieldChars[i, j];
-                }
-                gameFieldString[i] = row;
-            }
-            return gameFieldString;
-        }
-
-        //need to improve random numbers
         public char[,] CreateCompletedField(int width, int height, int minesCount)
         {
             char[,] fieldArray = new char[width, height];
@@ -86,7 +64,6 @@ namespace StudioTGMinesweeperService.Services
             }
             int MinesCount = minesCount;
 
-            //algorithm from github
             int mineIndex = 0;
             Random rnd = new Random();
 
@@ -95,9 +72,9 @@ namespace StudioTGMinesweeperService.Services
                 int firstRndNum = rnd.Next(0, width-1);
                 int secondRndNum = rnd.Next(0, height-1);
 
-                if (fieldArray[firstRndNum, secondRndNum] != 'X')//Field.FailedGameMine) //X symbol
+                if (fieldArray[firstRndNum, secondRndNum] != 'X')
                 {
-                    fieldArray[firstRndNum, secondRndNum] = 'X'; //Field.FailedGameMine;
+                    fieldArray[firstRndNum, secondRndNum] = 'X';
 
                     //Increases the cells value around the current mine.
                     for (int aroundMineI = firstRndNum - 1; aroundMineI <= firstRndNum + 1; aroundMineI++)
@@ -118,17 +95,6 @@ namespace StudioTGMinesweeperService.Services
                 }
             }
             return fieldArray;
-        }
-
-        public string[] CreateEmptyField(int width, int height)
-        {
-            string[] array = new string[height];
-            for (int i = 0; i < height; i++)
-            {
-                array[i] = new string(' ', width);
-            }
-
-            return array;
         }
     }
 }
